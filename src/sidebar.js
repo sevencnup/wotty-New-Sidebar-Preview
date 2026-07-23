@@ -339,6 +339,9 @@
     try { u = new URL(a.href); } catch (_) { return; }
     if (u.protocol !== "http:" && u.protocol !== "https:") return;
     if (u.origin === location.origin && u.pathname === location.pathname && u.search === location.search && u.hash) return;
+    // 站点根路径(xxx.com/ 或 xxx.com，/ 后无内容)不拦截，属站内首页导航
+    const rootPath = u.pathname === "/" || u.pathname === "";
+    if (rootPath && !u.search) return;
     const tgt = (a.target || "").toLowerCase();
     if (tgt === "_blank" || tgt === "_new") return;
     e.preventDefault();
