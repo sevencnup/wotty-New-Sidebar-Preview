@@ -25,7 +25,7 @@
 ### 方案 A：Developer / Nightly / ESR 版永久装未签名扩展（自用最省事）
 1. 装 [Firefox Developer Edition](https://www.mozilla.org/firefox/developer/) 或 Nightly / ESR（稳定版不支持关签名校验）
 2. 地址栏 `about:config` → 搜 `xpinstall.signatures.required` → 双击改为 `false`
-3. 用本目录已打包的 `sidebar-interceptor-v0.1.27.xpi`，拖进 `about:addons` 即永久安装
+3. 用本目录已打包的 `sidebar-interceptor-v0.1.33.xpi`，拖进 `about:addons` 即永久安装
 4. 重启浏览器扩展仍在，无需重装
 
 ### 方案 B：提交 AMO 签名（稳定版可用，需审核）
