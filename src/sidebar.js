@@ -45,21 +45,28 @@
   }
 
   // 快捷键关闭侧边栏
-  // - 默认(未设置)：不响应任何快捷键，只能点 ✕ 关，避免与网站 Esc 冲突
-  // - 自定义快捷键：捕获阶段响应；但网站已 defaultPrevented 该键则不关
+  // - 默认(未设置)：Esc 关侧边栏，但让网站优先——网站 defaultPrevented 了 Esc 就不关
+  // - 自定义快捷键：捕获阶段响应；网站已 defaultPrevented 该键则不关
   // - 禁用(false)：完全不响应
   document.addEventListener("keydown", (e) => {
     if (!host) return;
-    if (closeShortcut === false || !closeShortcut) return; // 未设或禁用，不响应
+    if (closeShortcut === false) return; // 已禁用
     if (closeShortcut && typeof closeShortcut === "object") {
-      if (e.defaultPrevented) return; // 网站已消费该键
+      // 自定义快捷键：捕获阶段抢先，但网站已消费则跳过
+      if (e.defaultPrevented) return;
       if (matchShortcut(e)) {
         e.preventDefault();
         e.stopPropagation();
         hide();
       }
+    } else {
+      // 默认 Esc：冒泡阶段最后触发，尊重网站
+      if (e.key !== "Escape") return;
+      if (e.defaultPrevented) return; // 网站已用 Esc 关图片等，不关侧边栏
+      if (e.cancelable) e.preventDefault();
+      hide();
     }
-  }, true);
+  }, false);
 
   // 设置关闭快捷键：点按钮后监听下一次按键录入
   function setShortcut() {
