@@ -1,4 +1,4 @@
-﻿#si-sidebar-host {
+#si-sidebar-host {
   position: fixed !important;
   top: 0 !important;
   right: 0 !important;
@@ -119,3 +119,29 @@
   z-index: 2147483646 !important;
 }
 #si-sidebar-host .si-opener.si-visible { display: flex !important; align-items: center !important; justify-content: center !important; }
+
+
+#si-sidebar-host .si-swap-arrow {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 20px !important;
+  height: 32px !important;
+  border: 1px solid #c8c8d0 !important;
+  border-radius: 5px !important;
+  background: #fff !important;
+  cursor: pointer !important;
+  font-size: 11px !important;
+  line-height: 30px !important;
+  color: #666 !important;
+  padding: 0 !important;
+  z-index: 11 !important;
+  transition: background 0.15s, color 0.15s !important;
+}
+#si-sidebar-host .si-swap-arrow:hover {
+  background: #eef0ff !important;
+  color: #335 !important;
+  border-color: #8898cc !important;
+}
+#si-sidebar-host .si-swap-left { left: -10px !important; }
+#si-sidebar-host .si-swap-right { left: -4px !important; }

@@ -237,8 +237,22 @@
 
     const splitter = document.createElement("div");
     splitter.className = "si-splitter";
-    splitter.title = "拖拽调整宽度";
+    splitter.title = "拖拽调整宽度 / 点箭头左右互换";
 
+    // 分界线上的左右交换箭头
+    const swapLeft = document.createElement("button");
+    swapLeft.className = "si-swap-arrow si-swap-left";
+    swapLeft.innerHTML = "&#9664;";
+    swapLeft.title = "右侧页扔到左边";
+    swapLeft.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); swapWithLeft(); });
+
+    const swapRight = document.createElement("button");
+    swapRight.className = "si-swap-arrow si-swap-right";
+    swapRight.innerHTML = "&#9654;";
+    swapRight.title = "左侧页扔到右边";
+    swapRight.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); swapWithLeft(); });
+
+    splitter.append(swapLeft, swapRight);
     bar.append(title, back, fwd, reload, urlBox, openBtn, swapBtn, keyBtn, globalBtn, close);
     host.append(bar);
     host.append(splitter);
@@ -297,6 +311,7 @@
     if (splitter.__siBound) return;
     splitter.__siBound = true;
     splitter.addEventListener("mousedown", (e) => {
+      if (e.target.classList.contains("si-swap-arrow")) return; // 点箭头不拖拽
       e.preventDefault();
       e.stopPropagation();
       splitter.classList.add("si-dragging");
