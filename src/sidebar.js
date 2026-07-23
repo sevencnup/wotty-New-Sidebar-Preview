@@ -1,57 +1,78 @@
-﻿// Sidebar Interceptor - content script
+// Sidebar Interceptor - content script
 // 在当前页注入右侧滑出侧边栏，用 iframe 加载被拦截的目标 URL
 
 (() => {
   if (window.__SIDEBAR_INTERCEPTOR__) return;
   window.__SIDEBAR_INTERCEPTOR__ = true;
 
-  // 自定义关闭快捷键，默认 ESC；按域名存储，ESC 被网站占用的站点可单独设其它键
+  // 自定义关闭快捷键：域名自定义 > 全局默认 > 硬编码 Esc
   const SHORTCUT_KEY = "si-sidebar-close-shortcut";
-  let closeShortcut = null; // {key, ctrl, alt, shift, meta} 或 false(禁用)
+  const GLOBAL_KEY = "@__global__";
+  // 域名级快捷键：undefined=未设置(回退全局) / null=Esc / {key...} / false=禁用
+  let domainShortcut = undefined;
+  // 全局默认快捷键：undefined=未设置(回退Esc) / null=Esc / {key...} / false=禁用
+  let globalShortcut = undefined;
   let shortcutLoaded = false;
   const sk = SHORTCUT_KEY + "@" + (location.hostname || "default");
-  // 同步优先从 localStorage 读，避免异步竞态导致默认 Esc 误关
+  const gsk = SHORTCUT_KEY + GLOBAL_KEY;
+  // 规范化：Esc 视作 null(Esc 默认)，其余对象原样，false 原样
+  function normShortcut(v) {
+    if (v === false) return false;
+    if (v && typeof v === "object") return v.key === "Escape" ? null : v;
+    return v;
+  }
+  // 同步优先从 localStorage 读域名+全局，避免异步竞态
   try {
     const ls = localStorage.getItem(sk);
-    if (ls === "false") { closeShortcut = false; shortcutLoaded = true; }
-    else if (ls) {
-      const parsed = JSON.parse(ls);
-      // Esc 不允许作为关侧边栏的快捷键(与网站冲突)，视作未设置
-      closeShortcut = (parsed && parsed.key === "Escape") ? null : parsed;
-      shortcutLoaded = true;
-    }
+    if (ls === "false") { domainShortcut = false; }
+    else if (ls) { domainShortcut = normShortcut(JSON.parse(ls)); }
+    const gls = localStorage.getItem(gsk);
+    if (gls === "false") { globalShortcut = false; }
+    else if (gls) { globalShortcut = normShortcut(JSON.parse(gls)); }
   } catch (_) {}
   // 再用 chrome.storage.local 跨设备同步(覆盖 localStorage)
   (async () => {
     try {
-      const r = await chrome.storage.local.get(sk);
+      const r = await chrome.storage.local.get([sk, gsk]);
       if (sk in r) {
-        const v = r[sk];
-        closeShortcut = (v && typeof v === "object" && v.key === "Escape") ? null : v;
-        try { localStorage.setItem(sk, (closeShortcut === false) ? "false" : JSON.stringify(closeShortcut)); } catch (_) {}
+        domainShortcut = normShortcut(r[sk]);
+        try { localStorage.setItem(sk, domainShortcut === false ? "false" : JSON.stringify(domainShortcut)); } catch (_) {}
+      }
+      if (gsk in r) {
+        globalShortcut = normShortcut(r[gsk]);
+        try { localStorage.setItem(gsk, globalShortcut === false ? "false" : JSON.stringify(globalShortcut)); } catch (_) {}
       }
       shortcutLoaded = true;
     } catch (_) { shortcutLoaded = true; }
   })();
+  // 解析有效快捷键：域名自定义 > 全局默认 > null(Esc)
+  // 返回 null=走默认Esc分支 / false=禁用 / {key...}=自定义键
+  function effectiveShortcut() {
+    if (domainShortcut !== undefined) return domainShortcut;
+    if (globalShortcut !== undefined) return globalShortcut;
+    return null;
+  }
 
   function matchShortcut(e) {
     if (!shortcutLoaded) return false; // 读取完成前不响应
-    if (closeShortcut === false) return false; // 已禁用
-    if (!closeShortcut) return false; // 未设置，不响应(Esc 归网站)
-    if (closeShortcut.key === "Escape") return false; // Esc 不作关侧边栏键
-    const keyOk = (closeShortcut.key && closeShortcut.key.toLowerCase() === e.key.toLowerCase());
-    const modOk = !!closeShortcut.ctrl === e.ctrlKey && !!closeShortcut.alt === e.altKey && !!closeShortcut.shift === e.shiftKey && !!closeShortcut.meta === e.metaKey;
+    const sc = effectiveShortcut();
+    if (sc === false) return false; // 已禁用
+    if (!sc) return false; // null/未设置走 Esc 分支，不在此匹配
+    if (sc.key === "Escape") return false; // Esc 不作匹配键(走默认 Esc 分支)
+    const keyOk = (sc.key && sc.key.toLowerCase() === e.key.toLowerCase());
+    const modOk = !!sc.ctrl === e.ctrlKey && !!sc.alt === e.altKey && !!sc.shift === e.shiftKey && !!sc.meta === e.metaKey;
     return keyOk && modOk;
   }
 
   // 快捷键关闭侧边栏
-  // - 默认(未设置)：Esc 关侧边栏，但让网站优先——网站 defaultPrevented 了 Esc 就不关
-  // - 自定义快捷键：捕获阶段响应；网站已 defaultPrevented 该键则不关
-  // - 禁用(false)：完全不响应
+  // - 有效快捷键为 {key...}：捕获阶段响应；网站已 defaultPrevented 该键则不关
+  // - 有效快捷键为 null(域名/全局均未设自定义)：默认 Esc，冒泡阶段最后触发，尊重网站
+  // - 有效快捷键为 false(禁用)：完全不响应
   document.addEventListener("keydown", (e) => {
     if (!host) return;
-    if (closeShortcut === false) return; // 已禁用
-    if (closeShortcut && typeof closeShortcut === "object") {
+    const sc = effectiveShortcut();
+    if (sc === false) return; // 已禁用
+    if (sc && typeof sc === "object") {
       // 自定义快捷键：捕获阶段抢先，但网站已消费则跳过
       if (e.defaultPrevented) return;
       if (matchShortcut(e)) {
@@ -69,41 +90,82 @@
   }, false);
 
   // 设置关闭快捷键：点按钮后监听下一次按键录入
+  // 设置本域名关闭快捷键：点按钮后监听下一次按键录入
   function setShortcut() {
     ensureHost();
     const urlBox = host.querySelector(".si-url");
     const tip = urlBox || { value: "" };
     const oldVal = tip.value;
-    tip.value = "按快捷键=设置 / Esc=恢复默认Esc / Backspace=彻底禁用快捷键";
+    tip.value = "按快捷键=设置本站 / Esc=恢复默认Esc / Backspace=彻底禁用";
     const onKey = (e) => {
       e.preventDefault();
       e.stopPropagation();
       document.removeEventListener("keydown", onKey, true);
-      const sk = SHORTCUT_KEY + "@" + (location.hostname || "default");
       shortcutLoaded = true;
       if (e.key === "Backspace" || e.key === "Delete") {
-        // 彻底禁用快捷键，只能用 ✕ 关闭
-        closeShortcut = false;
+        // 彻底禁用本站快捷键，只能用 ✕ 关闭
+        domainShortcut = false;
         try { localStorage.setItem(sk, "false"); } catch (_) {}
         try { chrome.storage.local.set({ [sk]: false }); } catch (_) {}
-        tip.value = "已禁用快捷键关闭";
+        tip.value = "已禁用本站快捷键关闭";
       } else if (e.key === "Escape") {
-        // Esc = 清除自定义，恢复默认 Esc 关闭
-        closeShortcut = null;
+        // Esc = 清除自定义，回退到全局默认或 Esc
+        domainShortcut = undefined;
         try { localStorage.removeItem(sk); } catch (_) {}
         try { chrome.storage.local.remove(sk); } catch (_) {}
-        tip.value = "已恢复默认：Esc 关闭";
+        tip.value = "已恢复：跟随全局默认";
       } else {
-        closeShortcut = { key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey };
-        try { localStorage.setItem(sk, JSON.stringify(closeShortcut)); } catch (_) {}
-        try { chrome.storage.local.set({ [sk]: closeShortcut }); } catch (_) {}
+        domainShortcut = { key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey };
+        try { localStorage.setItem(sk, JSON.stringify(domainShortcut)); } catch (_) {}
+        try { chrome.storage.local.set({ [sk]: domainShortcut }); } catch (_) {}
         const parts = [];
         if (e.ctrlKey) parts.push("Ctrl");
         if (e.altKey) parts.push("Alt");
         if (e.shiftKey) parts.push("Shift");
         if (e.metaKey) parts.push("Meta");
         parts.push(e.key.toUpperCase());
-        tip.value = "已设置：" + parts.join("+") + " 关闭";
+        tip.value = "已设置本站：" + parts.join("+") + " 关闭";
+      }
+      setTimeout(() => { tip.value = oldVal; }, 1600);
+    };
+    document.addEventListener("keydown", onKey, true);
+  }
+
+  // 设置全局默认快捷键：所有未单独设置的网站统一用此键
+  function setGlobalShortcut() {
+    ensureHost();
+    const urlBox = host.querySelector(".si-url");
+    const tip = urlBox || { value: "" };
+    const oldVal = tip.value;
+    tip.value = "[全局] 按键=设默认 / Esc=默认Esc / Backspace=默认禁用";
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      document.removeEventListener("keydown", onKey, true);
+      shortcutLoaded = true;
+      if (e.key === "Backspace" || e.key === "Delete") {
+        // 全局默认禁用：未单独设置的网站不能用快捷键关闭
+        globalShortcut = false;
+        try { localStorage.setItem(gsk, "false"); } catch (_) {}
+        try { chrome.storage.local.set({ [gsk]: false }); } catch (_) {}
+        tip.value = "已禁用全局默认快捷键";
+      } else if (e.key === "Escape") {
+        // Esc = 全局默认恢复为 Esc
+        globalShortcut = null;
+        try { localStorage.setItem(gsk, "null"); } catch (_) {}
+        try { chrome.storage.local.set({ [gsk]: null }); } catch (_) {}
+        tip.value = "全局默认已恢复：Esc 关闭";
+      } else {
+        globalShortcut = { key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey };
+        try { localStorage.setItem(gsk, JSON.stringify(globalShortcut)); } catch (_) {}
+        try { chrome.storage.local.set({ [gsk]: globalShortcut }); } catch (_) {}
+        const parts = [];
+        if (e.ctrlKey) parts.push("Ctrl");
+        if (e.altKey) parts.push("Alt");
+        if (e.shiftKey) parts.push("Shift");
+        if (e.metaKey) parts.push("Meta");
+        parts.push(e.key.toUpperCase());
+        tip.value = "全局默认已设：" + parts.join("+") + " 关闭";
       }
       setTimeout(() => { tip.value = oldVal; }, 1600);
     };
@@ -140,6 +202,7 @@
     const openBtn = mkBtn("⤢", "在新标签打开", () => { if (frame && frame.src) window.open(frame.src, "_blank"); });
     const close = mkBtn("✕", "关闭", hide);
     const keyBtn = mkBtn("⌨", "设置关闭快捷键", setShortcut);
+    const globalBtn = mkBtn("\u2699", "设置全局默认快捷键", setGlobalShortcut);
 
     const urlBox = document.createElement("input");
     urlBox.className = "si-url";
@@ -155,7 +218,7 @@
     splitter.className = "si-splitter";
     splitter.title = "拖拽调整宽度";
 
-    bar.append(title, back, fwd, reload, urlBox, openBtn, keyBtn, close);
+    bar.append(title, back, fwd, reload, urlBox, openBtn, keyBtn, globalBtn, close);
     host.append(bar);
     host.append(splitter);
 
