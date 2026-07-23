@@ -5,13 +5,103 @@
   if (window.__SIDEBAR_INTERCEPTOR__) return;
   window.__SIDEBAR_INTERCEPTOR__ = true;
 
-  // ESC 关闭侧边栏
+  // 自定义关闭快捷键，默认 ESC；按域名存储，ESC 被网站占用的站点可单独设其它键
+  const SHORTCUT_KEY = "si-sidebar-close-shortcut";
+  let closeShortcut = null; // {key, ctrl, alt, shift, meta} 或 false(禁用)
+  let shortcutLoaded = false;
+  const sk = SHORTCUT_KEY + "@" + (location.hostname || "default");
+  // 同步优先从 localStorage 读，避免异步竞态导致默认 Esc 误关
+  try {
+    const ls = localStorage.getItem(sk);
+    if (ls === "false") { closeShortcut = false; shortcutLoaded = true; }
+    else if (ls) {
+      const parsed = JSON.parse(ls);
+      // Esc 不允许作为关侧边栏的快捷键(与网站冲突)，视作未设置
+      closeShortcut = (parsed && parsed.key === "Escape") ? null : parsed;
+      shortcutLoaded = true;
+    }
+  } catch (_) {}
+  // 再用 chrome.storage.local 跨设备同步(覆盖 localStorage)
+  (async () => {
+    try {
+      const r = await chrome.storage.local.get(sk);
+      if (sk in r) {
+        const v = r[sk];
+        closeShortcut = (v && typeof v === "object" && v.key === "Escape") ? null : v;
+        try { localStorage.setItem(sk, (closeShortcut === false) ? "false" : JSON.stringify(closeShortcut)); } catch (_) {}
+      }
+      shortcutLoaded = true;
+    } catch (_) { shortcutLoaded = true; }
+  })();
+
+  function matchShortcut(e) {
+    if (!shortcutLoaded) return false; // 读取完成前不响应
+    if (closeShortcut === false) return false; // 已禁用
+    if (!closeShortcut) return false; // 未设置，不响应(Esc 归网站)
+    if (closeShortcut.key === "Escape") return false; // Esc 不作关侧边栏键
+    const keyOk = (closeShortcut.key && closeShortcut.key.toLowerCase() === e.key.toLowerCase());
+    const modOk = !!closeShortcut.ctrl === e.ctrlKey && !!closeShortcut.alt === e.altKey && !!closeShortcut.shift === e.shiftKey && !!closeShortcut.meta === e.metaKey;
+    return keyOk && modOk;
+  }
+
+  // 快捷键关闭侧边栏
+  // - 默认(未设置)：不响应任何快捷键，只能点 ✕ 关，避免与网站 Esc 冲突
+  // - 自定义快捷键：捕获阶段响应；但网站已 defaultPrevented 该键则不关
+  // - 禁用(false)：完全不响应
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && host) {
-      e.stopPropagation();
-      hide();
+    if (!host) return;
+    if (closeShortcut === false || !closeShortcut) return; // 未设或禁用，不响应
+    if (closeShortcut && typeof closeShortcut === "object") {
+      if (e.defaultPrevented) return; // 网站已消费该键
+      if (matchShortcut(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        hide();
+      }
     }
   }, true);
+
+  // 设置关闭快捷键：点按钮后监听下一次按键录入
+  function setShortcut() {
+    ensureHost();
+    const urlBox = host.querySelector(".si-url");
+    const tip = urlBox || { value: "" };
+    const oldVal = tip.value;
+    tip.value = "按快捷键=设置 / Esc=恢复默认Esc / Backspace=彻底禁用快捷键";
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      document.removeEventListener("keydown", onKey, true);
+      const sk = SHORTCUT_KEY + "@" + (location.hostname || "default");
+      shortcutLoaded = true;
+      if (e.key === "Backspace" || e.key === "Delete") {
+        // 彻底禁用快捷键，只能用 ✕ 关闭
+        closeShortcut = false;
+        try { localStorage.setItem(sk, "false"); } catch (_) {}
+        try { chrome.storage.local.set({ [sk]: false }); } catch (_) {}
+        tip.value = "已禁用快捷键关闭";
+      } else if (e.key === "Escape") {
+        // Esc = 清除自定义，恢复默认 Esc 关闭
+        closeShortcut = null;
+        try { localStorage.removeItem(sk); } catch (_) {}
+        try { chrome.storage.local.remove(sk); } catch (_) {}
+        tip.value = "已恢复默认：Esc 关闭";
+      } else {
+        closeShortcut = { key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey };
+        try { localStorage.setItem(sk, JSON.stringify(closeShortcut)); } catch (_) {}
+        try { chrome.storage.local.set({ [sk]: closeShortcut }); } catch (_) {}
+        const parts = [];
+        if (e.ctrlKey) parts.push("Ctrl");
+        if (e.altKey) parts.push("Alt");
+        if (e.shiftKey) parts.push("Shift");
+        if (e.metaKey) parts.push("Meta");
+        parts.push(e.key.toUpperCase());
+        tip.value = "已设置：" + parts.join("+") + " 关闭";
+      }
+      setTimeout(() => { tip.value = oldVal; }, 1600);
+    };
+    document.addEventListener("keydown", onKey, true);
+  }
 
   // 阻止侧边栏滚轮事件冒泡到主页，避免滚动穿透
   document.addEventListener("wheel", (e) => {
@@ -42,6 +132,7 @@
     const reload = mkBtn("⟳", "刷新", () => { if (frame && frame.src) rebuildFrame(frame.src); });
     const openBtn = mkBtn("⤢", "在新标签打开", () => { if (frame && frame.src) window.open(frame.src, "_blank"); });
     const close = mkBtn("✕", "关闭", hide);
+    const keyBtn = mkBtn("⌨", "设置关闭快捷键", setShortcut);
 
     const urlBox = document.createElement("input");
     urlBox.className = "si-url";
@@ -57,7 +148,7 @@
     splitter.className = "si-splitter";
     splitter.title = "拖拽调整宽度";
 
-    bar.append(title, back, fwd, reload, urlBox, openBtn, close);
+    bar.append(title, back, fwd, reload, urlBox, openBtn, keyBtn, close);
     host.append(bar);
     host.append(splitter);
 
@@ -171,15 +262,21 @@
     frame.style.transition = "opacity 0.18s ease";
     frame.addEventListener("load", () => {
       frame.style.opacity = "1";
-      // 尝试在 iframe 内部也监听 ESC(同域可行)；并把焦点拉回外层，确保 ESC 能关
+      // 尝试在 iframe 内监听自定义快捷键(同域可行)；Esc 不绑，归网站
       try {
         const cw = frame.contentWindow;
         if (cw) {
           cw.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") { e.preventDefault(); hide(); }
+            if (e.key === "Escape") return; // Esc 归网站
+            if (matchShortcut(e)) {
+              e.preventDefault();
+              e.stopPropagation();
+              hide();
+            }
           }, true);
         }
-      } catch (_) {}
+      } catch (_) {} // 跨域会抛错，跳过
+      // 把焦点拉回主页，确保自定义快捷键能被主页监听收到
       try { window.focus(); } catch (_) {}
     });
     // 兜底：超时强制显示，避免某些页面不触发 load
