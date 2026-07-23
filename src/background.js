@@ -118,3 +118,47 @@ async function openInSidebar(tabId, url) {
   } catch (e) {}
   return false;
 }
+
+
+// 左右交换：右侧侧边栏当前页 ⇄ 左边主标签页
+// content script 发 { type: "SWAP", sidebarUrl, leftUrl }
+// background 把主标签导航到 sidebarUrl，加载完后注入 sidebar 并加载 leftUrl
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "SWAP" && msg.sidebarUrl && sender.tab) {
+    const tabId = sender.tab.id;
+    const sidebarUrl = msg.sidebarUrl;
+    const leftUrl = msg.leftUrl;
+    (async () => {
+      try {
+        // 1. 主标签导航到右侧页
+        await chrome.tabs.update(tabId, { url: sidebarUrl });
+        // 2. 等导航完成
+        await waitForTabComplete(tabId);
+        // 3. 注入 sidebar 并加载 leftUrl 到侧边栏
+        const ok = await openInSidebar(tabId, leftUrl);
+        sendResponse({ ok });
+      } catch (e) {
+        sendResponse({ ok: false });
+      }
+    })();
+    return true; // 异步响应
+  }
+});
+
+// 等待标签导航完成(complete)
+function waitForTabComplete(tabId) {
+  return new Promise((resolve) => {
+    const listener = (id, info) => {
+      if (id === tabId && info.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+    // 兜底超时
+    setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    }, 15000);
+  });
+}

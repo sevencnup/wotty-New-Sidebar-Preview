@@ -173,6 +173,26 @@
   }
 
   // 阻止侧边栏滚轮事件冒泡到主页，避免滚动穿透
+  // 左右交换：右侧侧边栏当前页 ⇄ 左边主标签页
+  // 点一下把右侧页扔到左边主标签，左边原页扔到右侧侧边栏
+  function swapWithLeft() {
+    if (!frame || !frame.src) return;
+    const sidebarUrl = frame.src;
+    // about:blank 不交换
+    if (/^about:blank$/i.test(sidebarUrl)) return;
+    const leftUrl = location.href;
+    // 发 SWAP 给 background：主标签导航到 sidebarUrl，侧边栏加载 leftUrl
+    try {
+      chrome.runtime.sendMessage(
+        { type: "SWAP", sidebarUrl, leftUrl },
+        (resp) => {
+          // 交换成功后本侧 sidebar 会被主标签导航重置；先本地隐藏
+          if (resp && resp.ok) { hide(); }
+        }
+      );
+    } catch (_) {}
+  }
+
   document.addEventListener("wheel", (e) => {
     if (!host) return;
     if (host.contains(e.target)) {
@@ -201,6 +221,7 @@
     const reload = mkBtn("⟳", "刷新", () => { if (frame && frame.src) rebuildFrame(frame.src); });
     const openBtn = mkBtn("⤢", "在新标签打开", () => { if (frame && frame.src) window.open(frame.src, "_blank"); });
     const close = mkBtn("✕", "关闭", hide);
+    const swapBtn = mkBtn("\u21c4", "左右交换：右侧页与左侧主标签互换", swapWithLeft);
     const keyBtn = mkBtn("⌨", "设置关闭快捷键", setShortcut);
     const globalBtn = mkBtn("\u2699", "设置全局默认快捷键", setGlobalShortcut);
 
@@ -218,7 +239,7 @@
     splitter.className = "si-splitter";
     splitter.title = "拖拽调整宽度";
 
-    bar.append(title, back, fwd, reload, urlBox, openBtn, keyBtn, globalBtn, close);
+    bar.append(title, back, fwd, reload, urlBox, openBtn, swapBtn, keyBtn, globalBtn, close);
     host.append(bar);
     host.append(splitter);
 
@@ -421,6 +442,7 @@
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === "SIDEBAR_OPEN" && msg.url) {
+      if (host) hide(); // 清理旧侧边栏，确保干净加载
       openUrl(msg.url);
       sendResponse && sendResponse({ ok: true });
     }
