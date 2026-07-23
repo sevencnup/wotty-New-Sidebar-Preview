@@ -1,4 +1,71 @@
-﻿# 更新版本记录
+﻿## v0.1.15 - 2026-07-23
+- 新增来源页不可拦截识别：来源标签非 http(s) 页面(如 chrome://、about:、扩展页)则跳过拦截
+- 新增目标 URL 校验：非 http(s) 目标不拦截，避免 javascript:/data: 等被误拦
+- 受保护来源页点链接会正常打开新标签，不再尝试注入导致闪烁失败
+## v0.1.14 - 2026-07-23
+- 修复点链接"闪烁一下永远打不开"的严重问题
+- 根因：先关闭新标签再发消息开侧边栏，若消息/注入失败链接就丢失了
+- 改为：先确认侧边栏成功打开才关闭新标签，失败则保留新标签正常导航
+- 加 handled 去重，避免 onCreated 与 onBeforeNavigate 重复处理同一新标签
+- openInSidebar 发消息失败会自动注入 content script 再重试
+## v0.1.13 - 2026-07-23
+- 修复鼠标焦点在侧边栏 iframe 内时按 ESC 无法关闭的问题
+- iframe load 后把焦点拉回外层主页，确保外层 keydown 监听能收到 ESC
+- 同域 iframe 尝试在其 contentWindow 上也监听 ESC(跨域被安全限制跳过)
+## v0.1.12 - 2026-07-23
+- 修复打开侧边栏时"先到中间宽度再缩回设置宽度"的闪动
+- 根因：ensureHost 用 CSS 默认 45vw 先显示，异步 loadWidth 再覆盖
+- 改为 openUrl 中先 await loadWidth 宽度就绪再 show
+- 侧边栏出场动画改为淡入(不滑动)，iframe 加载完再显示内容，减少白屏闪现
+## v0.1.11 - 2026-07-23
+- 调整滚动隔离策略：去掉打开时锁定主页 overflow，恢复主页可正常滚动
+- iframe 为独立文档，鼠标在哪边滚哪边，天然独立
+- 保留 overscroll-behavior:contain 和 wheel 冒泡阻止，防止侧边栏滚到底穿透到主页
+## v0.1.10 - 2026-07-23
+- 修复侧边栏滚动条控制主页滚动的问题
+- 删除 #si-sidebar-host 误留的 all: revert，避免布局被重置
+- 侧边栏打开时锁定主页滚动(overflow:hidden)，关闭时恢复
+- host 加 overscroll-behavior:contain 防止滚动穿透
+- 捕获阶段阻止侧边栏内 wheel 事件冒泡到主页
+## v0.1.9 - 2026-07-23
+- 侧边栏宽度改为按域名独立保存
+- 存储 key 改为 "si-sidebar-width@<域名>"，每个网站各自记忆宽度
+- 切换网站时自动恢复该站上次宽度，互不影响
+## v0.1.8 - 2026-07-23
+- 新增按 ESC 关闭侧边栏
+- 捕获阶段监听 keydown，ESC 时触发淡出销毁
+## v0.1.7 - 2026-07-23
+- 关闭动画改为原地淡出消失，不再向右滑动收回
+- hide 时不再移除 si-open，避免触发右滑过渡
+- CSS 调整 .si-fadeout 优先级，强制 transform:none + opacity 渐降
+## v0.1.6 - 2026-07-23
+- 关闭改为淡出销毁：不再滑回右侧、不再保留展开按钮
+- 点击✕后侧边栏向右淡出+透明度渐降，260ms 后从 DOM 移除并清空状态
+- 下次打开重新构建侧边栏
+## v0.1.5 - 2026-07-23
+- 修复拖拽松开后仍跟随鼠标移动：iframe 吞掉 mouseup 导致监听未移除
+- mousemove/mouseup 改挂 window 捕获阶段，拖拽时禁用 iframe pointer-events
+- 防止 splitter 重复绑定事件
+## v0.1.4 - 2026-07-23
+- 修复拖拽无法改变宽度：CSS 中 width/max-width/min-width 的 !important 覆盖了 JS 设的 inline 宽度
+- 去掉这三处 !important，JS 改用 setProperty(...,important) 接管宽度
+- splitter 移到 host 内左缘(6px)并提高层级，拖拽时高亮反馈
+- 加 e.stopPropagation 防止拖拽误触发链接拦截
+## v0.1.3 - 2026-07-23
+- 侧边栏支持自定义宽度：左侧拖拽条拖动调整，参考 liunxdo 插件实现
+- 宽度持久化改用 chrome.storage.local，跨所有域名全局永久保存
+- 宽度限制：最小 280px，最大 92% 视窗宽度
+- 窗口 resize 时自动约束宽度不越界
+## v0.1.2 - 2026-07-23
+- 修复打开新页面时旧页面残留/缓存闪现问题
+- openUrl/后退/前进/刷新改为每次销毁重建 iframe，彻底清除旧页面状态(bfcache)
+- 历史栈数组保持不变，导航不受影响
+## v0.1.1 - 2026-07-23
+- 新增同标签页链接点击拦截：左键点击普通 <a> 链接改为侧边栏打开，保留当前页
+- 自动跳过：已阻止默认事件、非左键、带修饰键(Ctrl/Shift/Meta/Alt)、target=_blank/new、纯页内锚点(#hash)、非 http(s) 协议
+- 新标签跳转拦截(background)保持不变
+- 注意：JS 主动 location.href= 跳转属浏览器扩展不可拦截项，不做强行回拉以免破坏原页面状态
+# 更新版本记录
 
 ## v0.1.0 - 2026-07-23
 - 初始版本

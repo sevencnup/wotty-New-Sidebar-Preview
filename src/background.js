@@ -1,8 +1,10 @@
-﻿// Sidebar Interceptor - background service worker
+// Sidebar Interceptor - background service worker
 // 拦截新标签/新窗口跳转，改在源标签右侧侧边栏加载
 
 // 记录待处理的新标签：tabId -> { openerTabId }
 const pending = new Map();
+// 已处理过的新标签，避免 onBeforeNavigate 与 onCreated 重复处理
+const handled = new Set();
 
 const BLANK = /^(about:blank|about:newtab|chrome:\/\/.*|edge:\/\/.*|chrome-extension:\/\/.*|edge-extension:\/\/.*)$/i;
 
@@ -10,62 +12,74 @@ function isBlank(url) {
   return !url || BLANK.test(url);
 }
 
-// 用户主动开的新标签（点+号、Ctrl+T、从其它扩展打开）没有 openerTabId，
-// 因此只有存在 openerTabId 的跳转才视为"由当前页触发"并拦截。
-chrome.tabs.onCreated.addListener(async (tab) => {
+// 来源标签必须是可注入 content script 的普通 http(s) 页面，否则跳过拦截
+async function isInterceptableTab(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab) return false;
+    if (tab.id === chrome.tabs.TAB_ID_NONE) return false;
+    const u = tab.url || "";
+    return /^https?:///i.test(u);
+  } catch (_) { return false; }
+}
+
+chrome.tabs.onCreated.addListener((tab) => {
   const url = tab.pendingUrl || tab.url || "";
   if (isBlank(url)) {
-    // 暂存，等待首次真实导航
-    if (tab.openerTabId != null || tab.id != null) {
-      pending.set(tab.id, { openerTabId: tab.openerTabId });
-    }
+    if (tab.id != null) pending.set(tab.id, { openerTabId: tab.openerTabId });
     return;
   }
-  await tryIntercept(tab.id, tab.openerTabId, url);
+  if (handled.has(tab.id)) return;
+  handled.add(tab.id);
+  tryIntercept(tab.id, tab.openerTabId, url);
 });
 
-// 兜底：onCreated 时 url 还是 about:blank 的情况
 chrome.webNavigation.onBeforeNavigate.addListener((d) => {
   if (d.frameId !== 0) return;
   const p = pending.get(d.tabId);
   if (!p) return;
-  if (isBlank(d.url)) return; // 继续等待真实导航
+  if (isBlank(d.url)) return;
+  if (handled.has(d.tabId)) return;
+  handled.add(d.tabId);
   pending.delete(d.tabId);
-  chrome.tabs.get(d.tabId, async (tab) => {
+  chrome.tabs.get(d.tabId, (tab) => {
     const opener = (tab && tab.openerTabId != null) ? tab.openerTabId : p.openerTabId;
-    await tryIntercept(d.tabId, opener, d.url);
+    tryIntercept(d.tabId, opener, d.url);
   });
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   pending.delete(tabId);
+  handled.delete(tabId);
 });
 
+// 先尝试在源标签开侧边栏，成功后才关闭新标签；失败则保留新标签正常导航
 async function tryIntercept(tabId, openerTabId, url) {
   if (openerTabId == null) return; // 无来源，不拦截
   if (isBlank(url)) return;
-  // 关闭刚创建的新标签
-  try {
-    await chrome.tabs.remove(tabId);
-  } catch (e) {
-    // 可能已被关闭
+  // 目标必须是普通网页，非 http(s) 不拦截
+  if (!/^https?:\/\//i.test(url)) return;
+  // 来源页不是可拦截的普通网页(如 chrome://、about:、扩展页)，跳过，正常打开新标签
+  if (!(await isInterceptableTab(openerTabId))) return;
+  const ok = await openInSidebar(openerTabId, url);
+  if (ok) {
+    try { await chrome.tabs.remove(tabId); } catch (e) {}
   }
-  // 通知源标签显示侧边栏
-  await openInSidebar(openerTabId, url);
+  // 失败则不关新标签，让它正常加载，避免链接丢失
 }
 
 async function openInSidebar(tabId, url) {
+  // 先尝试直接发消息（content script 可能已注入）
   try {
-    await chrome.tabs.sendMessage(tabId, { type: "SIDEBAR_OPEN", url });
-    return;
-  } catch (e) {
-    // content script 可能尚未注入（如页面先于扩展加载），手动注入
-  }
+    const resp = await chrome.tabs.sendMessage(tabId, { type: "SIDEBAR_OPEN", url });
+    if (resp && resp.ok) return true;
+  } catch (e) {}
+  // content script 尚未注入，手动注入再发
   try {
     await chrome.scripting.insertCSS({ target: { tabId }, files: ["src/sidebar.css"] });
     await chrome.scripting.executeScript({ target: { tabId }, files: ["src/sidebar.js"] });
-    await chrome.tabs.sendMessage(tabId, { type: "SIDEBAR_OPEN", url });
-  } catch (e) {
-    // 源标签为受保护页面（chrome://、应用商店等），无法注入，跳过
-  }
+    const resp = await chrome.tabs.sendMessage(tabId, { type: "SIDEBAR_OPEN", url });
+    if (resp && resp.ok) return true;
+  } catch (e) {}
+  return false;
 }
