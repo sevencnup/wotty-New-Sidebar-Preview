@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sidebar Interceptor - 新页跳转拦截侧边栏",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "description": "拦截浏览器所有新标签/新窗口的跳转，改为在当前页右侧滑出侧边栏中加载显示。",
   "permissions": [
     "tabs",
@@ -12,7 +12,14 @@
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "scripts": ["src/background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sidebar-interceptor@sevencnup",
+      "strict_min_version": "115.0"
+    }
   },
   "content_scripts": [
     {

@@ -1,3 +1,9 @@
+## v0.1.27 - 2026-07-23
+- 新增火狐(Firefox)兼容：manifest 加 background.scripts + browser_specific_settings.gecko
+- 修复关闭一次侧边栏后拦截失效、需重载扩展的 bug
+- 根因：MV3 service worker 30秒空闲挂起，pending/handled 内存状态丢失
+- 将 pending/handled 持久化到 chrome.storage.session，SW 挂起重启状态完整恢复
+
 ## v0.1.26 - 2026-07-23
 - 新增全局默认快捷键功能：可修改全局默认关闭键，未单独设置快捷键的网站统一用全局默认
 - 快捷键解析优先级：域名自定义 > 全局默认 > 硬编码 Esc

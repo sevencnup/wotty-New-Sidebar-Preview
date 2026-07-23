@@ -1,10 +1,39 @@
-// Sidebar Interceptor - background service worker
+// Sidebar Interceptor - background service worker / 事件页
 // 拦截新标签/新窗口跳转，改在源标签右侧侧边栏加载
+// MV3 service worker 会挂起，内存状态不保；用 chrome.storage.session 持久化 pending/handled
 
+const PENDING_KEY = "si-pending";
+const HANDLED_KEY = "si-handled";
 // 记录待处理的新标签：tabId -> { openerTabId }
 const pending = new Map();
 // 已处理过的新标签，避免 onBeforeNavigate 与 onCreated 重复处理
 const handled = new Set();
+let stateReady = false;
+
+// 启动时从 session 恢复状态（SW 挂起重启不丢）
+(async () => {
+  try {
+    const r = await chrome.storage.session.get([PENDING_KEY, HANDLED_KEY]);
+    if (r[PENDING_KEY] && typeof r[PENDING_KEY] === "object") {
+      for (const [k, v] of Object.entries(r[PENDING_KEY])) pending.set(Number(k), v);
+    }
+    if (Array.isArray(r[HANDLED_KEY])) {
+      for (const id of r[HANDLED_KEY]) handled.add(id);
+    }
+  } catch (_) {}
+  stateReady = true;
+})();
+
+function persistPending() {
+  try {
+    const obj = {};
+    for (const [k, v] of pending) obj[k] = v;
+    chrome.storage.session.set({ [PENDING_KEY]: obj });
+  } catch (_) {}
+}
+function persistHandled() {
+  try { chrome.storage.session.set({ [HANDLED_KEY]: Array.from(handled) }); } catch (_) {}
+}
 
 const BLANK = /^(about:blank|about:newtab|chrome:\/\/.*|edge:\/\/.*|chrome-extension:\/\/.*|edge-extension:\/\/.*)$/i;
 
@@ -27,10 +56,12 @@ chrome.tabs.onCreated.addListener((tab) => {
   const url = tab.pendingUrl || tab.url || "";
   if (isBlank(url)) {
     if (tab.id != null) pending.set(tab.id, { openerTabId: tab.openerTabId });
+    persistPending();
     return;
   }
   if (handled.has(tab.id)) return;
   handled.add(tab.id);
+  persistHandled();
   tryIntercept(tab.id, tab.openerTabId, url);
 });
 
@@ -42,7 +73,9 @@ chrome.webNavigation.onBeforeNavigate.addListener((d) => {
   if (handled.has(d.tabId)) return;
   handled.add(d.tabId);
   pending.delete(d.tabId);
+  persistHandled();
   chrome.tabs.get(d.tabId, (tab) => {
+    persistPending();
     const opener = (tab && tab.openerTabId != null) ? tab.openerTabId : p.openerTabId;
     tryIntercept(d.tabId, opener, d.url);
   });
@@ -51,6 +84,8 @@ chrome.webNavigation.onBeforeNavigate.addListener((d) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   pending.delete(tabId);
   handled.delete(tabId);
+  persistPending();
+  persistHandled();
 });
 
 // 先尝试在源标签开侧边栏，成功后才关闭新标签；失败则保留新标签正常导航
