@@ -1,4 +1,4 @@
-﻿# Sidebar Interceptor 新页跳转拦截侧边栏
+# Sidebar Interceptor 新页跳转拦截侧边栏
 
 一个 Chrome / Edge 浏览器扩展（Manifest V3）。把浏览器中**所有**"打开新标签页 / 新窗口"的跳转拦截下来，改为在当前页右侧滑出一个侧边栏，用 iframe 加载目标页面。
 
@@ -17,6 +17,25 @@
 4. 正常浏览网页即可，点击任何"在新标签打开"的链接会变成右侧滑出侧边栏
 
 > 受浏览器保护页面（`chrome://`、扩展商店、`about:` 等）无法注入侧边栏，这类新标签跳转不拦截。
+
+## 安装 - Firefox（永久，不用每次重装）
+
+> 火狐稳定版强制要签名扩展，临时扩展关浏览器即失效。两种永久方案：
+
+### 方案 A：Developer / Nightly / ESR 版永久装未签名扩展（自用最省事）
+1. 装 [Firefox Developer Edition](https://www.mozilla.org/firefox/developer/) 或 Nightly / ESR（稳定版不支持关签名校验）
+2. 地址栏 `about:config` → 搜 `xpinstall.signatures.required` → 双击改为 `false`
+3. 用本目录已打包的 `sidebar-interceptor-v0.1.27.xpi`，拖进 `about:addons` 即永久安装
+4. 重启浏览器扩展仍在，无需重装
+
+### 方案 B：提交 AMO 签名（稳定版可用，需审核）
+1. 注册 [addons.mozilla.org](https://addons.mozilla.org/developers/) 开发者账号，生成 API key/secret
+2. `npx web-ext sign --api-key=XXX --api-secret=YYY` 生成签名版 xpi
+3. 签名后的 xpi 可在火狐稳定版永久安装
+
+### 方案 C：临时加载（关浏览器失效，仅调试用）
+`about:debugging#/runtime/this-firefox` → 「加载临时附加组件」→ 选 `manifest.json`
+
 
 ## 技术原理
 - `chrome.tabs.onCreated` + `chrome.webNavigation.onBeforeNavigate`：捕获新标签及其来源 `openerTabId`

@@ -1,3 +1,7 @@
+## v0.1.28 - 2026-07-23
+- 新增 Firefox 永久安装说明(README)：Developer/Nightly/ESR 关签名校验装 xpi，或 AMO 签名装稳定版
+- 打包 sidebar-interceptor-v0.1.27.xpi 安装包，拖进 about:addons 即永久安装
+
 ## v0.1.27 - 2026-07-23
 - 新增火狐(Firefox)兼容：manifest 加 background.scripts + browser_specific_settings.gecko
 - 修复关闭一次侧边栏后拦截失效、需重载扩展的 bug
