@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <span class="title">Sidebar Interceptor</span>
+    <span class="ver" id="ver"></span>
+  </div>
+  <div class="row current">
+    <div class="info">
+      <div class="label">当前站点</div>
+      <div class="host" id="curHost">—</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="toggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="section">
+    <div class="label">已启用站点</div>
+    <ul id="sites"></ul>
+    <div class="empty" id="empty">暂无启用站点</div>
+  </div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>

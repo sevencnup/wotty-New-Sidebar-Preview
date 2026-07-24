@@ -68,26 +68,6 @@ function hostOf(url) {
   try { return new URL(url).hostname; } catch (_) { return ""; }
 }
 
-chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab || !tab.id) return;
-  const host = hostOf(tab.url || "");
-  if (!host) return;
-  const sites = await getEnabledSites();
-  let on;
-  if (sites.has(host)) { sites.delete(host); on = false; }
-  else { sites.add(host); on = true; }
-  await chrome.storage.local.set({ [SITES_KEY]: Array.from(sites) });
-  try { await chrome.tabs.reload(tab.id); } catch (_) {}
-  await updateActionBadge(tab.id, on);
-});
-
-async function updateActionBadge(tabId, on) {
-  try {
-    await chrome.action.setBadgeText({ tabId, text: on ? "ON" : "" });
-    await chrome.action.setBadgeBackgroundColor({ tabId, color: "#22a06b" });
-  } catch (_) {}
-}
-
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (info.status === "complete") {
     const host = hostOf(tab.url || "");
