@@ -52,6 +52,52 @@ async function isInterceptableTab(tabId) {
   } catch (_) { return false; }
 }
 
+const SITES_KEY = "si-enabled-sites";
+async function getEnabledSites() {
+  try {
+    const r = await chrome.storage.local.get(SITES_KEY);
+    return new Set(r[SITES_KEY] || []);
+  } catch (_) { return new Set(); }
+}
+async function siteEnabled(host) {
+  if (!host) return false;
+  const sites = await getEnabledSites();
+  return sites.has(host);
+}
+function hostOf(url) {
+  try { return new URL(url).hostname; } catch (_) { return ""; }
+}
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab || !tab.id) return;
+  const host = hostOf(tab.url || "");
+  if (!host) return;
+  const sites = await getEnabledSites();
+  let on;
+  if (sites.has(host)) { sites.delete(host); on = false; }
+  else { sites.add(host); on = true; }
+  await chrome.storage.local.set({ [SITES_KEY]: Array.from(sites) });
+  try { await chrome.tabs.reload(tab.id); } catch (_) {}
+  await updateActionBadge(tab.id, on);
+});
+
+async function updateActionBadge(tabId, on) {
+  try {
+    await chrome.action.setBadgeText({ tabId, text: on ? "ON" : "" });
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: "#22a06b" });
+  } catch (_) {}
+}
+
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (info.status === "complete") {
+    const host = hostOf(tab.url || "");
+    if (host) {
+      const on = await siteEnabled(host);
+      await updateActionBadge(tabId, on);
+    }
+  }
+});
+
 chrome.tabs.onCreated.addListener((tab) => {
   const url = tab.pendingUrl || tab.url || "";
   if (isBlank(url)) {
@@ -96,6 +142,9 @@ async function tryIntercept(tabId, openerTabId, url) {
   if (!/^https?:\/\//i.test(url)) return;
   // 来源页不是可拦截的普通网页(如 chrome://、about:、扩展页)，跳过，正常打开新标签
   if (!(await isInterceptableTab(openerTabId))) return;
+  let openerHost = "";
+  try { const ot = await chrome.tabs.get(openerTabId); openerHost = hostOf(ot.url || ""); } catch (_) {}
+  if (!(await siteEnabled(openerHost))) return;
   const ok = await openInSidebar(openerTabId, url);
   if (ok) {
     try { await chrome.tabs.remove(tabId); } catch (e) {}

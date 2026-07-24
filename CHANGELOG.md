@@ -1,3 +1,11 @@
+## v0.1.34 - 2026-07-24
+- 新增"本站生效"白名单机制：默认不全局拦截，需手动点工具栏按钮开启
+- 工具栏按钮点击 toggle 当前站点启用状态，显示 ON 角标
+- background tryIntercept 查来源站白名单，未启用则不拦截
+- content script 同标签点击拦截也查白名单，未启用站点链接照常导航
+- 白名单存 chrome.storage.local，content script 用 localStorage 同步缓存
+- manifest 修复 name/description 乱码，加 action 配置
+
 ## v0.1.33 - 2026-07-23
 - 微调分界线箭头间距：从 24px 收到 14px，更紧凑不重叠
 

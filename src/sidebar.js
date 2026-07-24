@@ -5,6 +5,22 @@
   if (window.__SIDEBAR_INTERCEPTOR__) return;
   window.__SIDEBAR_INTERCEPTOR__ = true;
 
+  const SITES_KEY = "si-enabled-sites";
+  let siteOn = false;
+  try {
+    const ls = localStorage.getItem("si-site-on@" + (location.hostname || ""));
+    siteOn = ls === "1";
+  } catch (_) {}
+  (async () => {
+    try {
+      const r = await chrome.storage.local.get(SITES_KEY);
+      const sites = new Set(r[SITES_KEY] || []);
+      siteOn = sites.has(location.hostname || "");
+      try { localStorage.setItem("si-site-on@" + (location.hostname || ""), siteOn ? "1" : "0"); } catch (_) {}
+    } catch (_) {}
+  })();
+  function siteEnabledHere() { return siteOn }
+
   // 自定义关闭快捷键：域名自定义 > 全局默认 > 硬编码 Esc
   const SHORTCUT_KEY = "si-sidebar-close-shortcut";
   const GLOBAL_KEY = "@__global__";
@@ -428,6 +444,7 @@
 
   // 同标签页链接点击拦截：左键点击普通链接改为侧边栏打开，保留当前页
   document.addEventListener("click", (e) => {
+    if (!siteEnabledHere()) return;
     if (e.defaultPrevented || e.button !== 0) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     let a = e.target;
