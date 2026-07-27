@@ -403,8 +403,50 @@
     });
     // 兜底：超时强制显示，避免某些页面不触发 load
     setTimeout(() => { if (frame) frame.style.opacity = "1"; }, 1500);
+    let loaded = false;
+    let failTimer = null;
+    frame.addEventListener("load", () => {
+      loaded = true;
+      if (failTimer) { clearTimeout(failTimer); failTimer = null; }
+      frame.style.opacity = "1";
+      try {
+        const doc = frame.contentDocument;
+        if (doc && (!doc.body || doc.body.children.length === 0) && !doc.title) {
+          showFallback(url);
+        } else {
+          removeFallback();
+        }
+      } catch (_) { removeFallback(); }
+    });
+    failTimer = setTimeout(() => {
+      if (!loaded) showFallback(url);
+    }, 8000);
     frame.src = url || "about:blank";
     host.append(frame);
+  }
+
+  function showFallback(url) {
+    ensureHost();
+    let fb = host.querySelector(".si-fallback");
+    if (!fb) {
+      fb = document.createElement("div");
+      fb.className = "si-fallback";
+      const tip = document.createElement("div");
+      tip.className = "si-fallback-tip";
+      tip.textContent = "该网站无法在侧边栏内加载（可能需要登录或禁止嵌入）";
+      const btn = document.createElement("button");
+      btn.className = "si-fallback-btn";
+      btn.textContent = "在新标签打开";
+      btn.addEventListener("click", () => { window.open(url, "_blank"); hide(); });
+      fb.append(tip, btn);
+      host.append(fb);
+    }
+    fb.style.display = "flex";
+  }
+  function removeFallback() {
+    if (!host) return;
+    const fb = host.querySelector(".si-fallback");
+    if (fb) fb.style.display = "none";
   }
 
   function show() {

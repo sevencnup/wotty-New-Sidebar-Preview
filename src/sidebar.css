@@ -145,3 +145,33 @@
 }
 #si-sidebar-host .si-swap-left { left: -14px !important; }
 #si-sidebar-host .si-swap-right { right: -14px !important; }
+
+#si-sidebar-host .si-fallback {
+  position: absolute !important;
+  inset: 44px 0 0 0 !important;
+  display: none !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  background: #f7f8fa !important;
+  text-align: center !important;
+  padding: 24px !important;
+  z-index: 20 !important;
+}
+#si-sidebar-host .si-fallback-tip {
+  font-size: 13px !important;
+  color: #555 !important;
+  line-height: 1.6 !important;
+  max-width: 320px !important;
+}
+#si-sidebar-host .si-fallback-btn {
+  padding: 8px 18px !important;
+  border: 1px solid #22a06b !important;
+  border-radius: 6px !important;
+  background: #22a06b !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+}
+#si-sidebar-host .si-fallback-btn:hover { background: #1c8c5c !important; }
