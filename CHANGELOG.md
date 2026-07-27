@@ -1,3 +1,10 @@
+## userscript-v0.2.2 - 2026-07-27
+- 修复 south-plus.net 帖子链接（如 `/read.php?tid-xxxx.html`）点击后仍跳转当前页/新标签的问题
+- 油猴脚本改为 `document-start` 运行，尽早注册点击拦截
+- 链接拦截改用统一 `shouldOpenInSidebar()` 判断，直接接管普通链接与 `target=_blank/_new` 链接
+- 同时 patch `window.open` 与 `unsafeWindow.open`，拦截页面脚本触发的新窗口
+- 点击事件改用 `stopImmediatePropagation()`，减少被站点脚本或其他油猴脚本抢先处理的概率
+
 ## v0.1.40 - 2026-07-27
 - 修复顶栏"在新标签打开"按钮失效：openInNewTab 函数定义丢失
 - 补回 openInNewTab 函数，通过 OPEN_NEW_TAB 消息走 background 开新标签并跳过拦截

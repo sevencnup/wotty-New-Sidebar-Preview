@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Sidebar Interceptor - 侧边栏预览
 // @namespace    https://github.com/sevencnup/sidebar-interceptor
-// @version      0.2.1
+// @version      0.2.2
 // @description  拦截页面内新标签跳转，改为右侧滑出侧边栏预览。轻量油猴版，无需安装扩展。
 // @author       sevencnup
 // @match        *://*/*
+// @grant        unsafeWindow
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -12,7 +13,7 @@
 // @grant        GM_openInTab
 // @grant        GM_addStyle
 // @grant        GM_registerMenuCommand
-// @run-at       document-idle
+// @run-at       document-start
 // @noframes
 // ==/UserScript==
 
@@ -525,6 +526,14 @@
     if (host.contains(e.target)) e.stopPropagation();
   }, true);
 
+  function shouldOpenInSidebar(u) {
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    if (u.origin === location.origin && u.pathname === location.pathname && u.search === location.search && u.hash) return false;
+    const rootPath = u.pathname === "/" || u.pathname === "";
+    if (rootPath && !u.search) return false;
+    return true;
+  }
+
   // ===== 链接拦截 =====
   document.addEventListener("click", (e) => {
     if (!siteEnabled()) return;
@@ -535,32 +544,34 @@
     if (a.tagName !== "A") a = a.closest ? a.closest("a") : null;
     if (!a || !a.href) return;
     let u;
-    try { u = new URL(a.href); } catch (_) { return; }
-    if (u.protocol !== "http:" && u.protocol !== "https:") return;
-    if (u.origin === location.origin && u.pathname === location.pathname && u.search === location.search && u.hash) return;
-    const rootPath = u.pathname === "/" || u.pathname === "";
-    if (rootPath && !u.search) return;
-    const tgt = (a.target || "").toLowerCase();
-    if (tgt === "_blank" || tgt === "_new") a.removeAttribute("target");
+    try { u = new URL(a.href, location.href); } catch (_) { return; }
+    if (!shouldOpenInSidebar(u)) return;
+    a.removeAttribute("target");
     e.preventDefault();
-    e.stopPropagation();
-    openUrl(a.href);
+    e.stopImmediatePropagation();
+    openUrl(u.href);
   }, true);
 
   // ===== window.open 拦截 =====
-  const rawWindowOpen = window.open;
-  window.open = function(url, target, features) {
-    if (siteEnabled() && typeof url === "string") {
-      try {
-        const u = new URL(url, location.href);
-        if (u.protocol === "http:" || u.protocol === "https:") {
-          openUrl(u.href);
-          return null;
-        }
-      } catch (_) {}
-    }
-    return rawWindowOpen.call(window, url, target, features);
-  };
+  function patchWindowOpen(win) {
+    if (!win || win.__SI_WINDOW_OPEN_PATCHED__) return;
+    win.__SI_WINDOW_OPEN_PATCHED__ = true;
+    const rawWindowOpen = win.open;
+    win.open = function(url, target, features) {
+      if (siteEnabled() && typeof url === "string") {
+        try {
+          const u = new URL(url, location.href);
+          if (shouldOpenInSidebar(u)) {
+            openUrl(u.href);
+            return null;
+          }
+        } catch (_) {}
+      }
+      return rawWindowOpen.call(win, url, target, features);
+    };
+  }
+  patchWindowOpen(window);
+  try { patchWindowOpen(unsafeWindow); } catch (_) {}
 
   // ===== 设置面板 =====
   function createPanel() {
@@ -582,7 +593,7 @@
     titleSpan.textContent = "Sidebar Interceptor";
     const verSpan = document.createElement("span");
     verSpan.className = "sp-ver";
-    verSpan.innerHTML = '油猴版 v0.2.1 <a href="https://github.com/sevencnup/sidebar-interceptor" target="_blank">GitHub</a>';
+    verSpan.innerHTML = '油猴版 v0.2.2 <a href="https://github.com/sevencnup/sidebar-interceptor" target="_blank">GitHub</a>';
     header.append(titleSpan, verSpan);
 
     // 当前站点行
