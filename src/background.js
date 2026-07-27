@@ -53,6 +53,8 @@ async function isInterceptableTab(tabId) {
 }
 
 const SITES_KEY = "si-enabled-sites";
+// 侧边栏主动"在新标签打开"时，临时跳过拦截，避免又拦回侧边栏
+const skipUrls = new Set();
 async function getEnabledSites() {
   try {
     const r = await chrome.storage.local.get(SITES_KEY);
@@ -119,6 +121,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // 先尝试在源标签开侧边栏，成功后才关闭新标签；失败则保留新标签正常导航
 async function tryIntercept(tabId, openerTabId, url) {
+  if (skipUrls.has(url)) { skipUrls.delete(url); return; }
   if (openerTabId == null) return; // 无来源，不拦截
   if (isBlank(url)) return;
   // 目标必须是普通网页，非 http(s) 不拦截
@@ -156,6 +159,13 @@ async function openInSidebar(tabId, url) {
 // content script 发 { type: "SWAP", sidebarUrl, leftUrl }
 // background 把主标签导航到 sidebarUrl，加载完后注入 sidebar 并加载 leftUrl
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "OPEN_NEW_TAB" && msg.url) {
+    skipUrls.add(msg.url);
+    try { chrome.tabs.create({ url: msg.url }); } catch (_) {}
+    setTimeout(() => skipUrls.delete(msg.url), 10000);
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg && msg.type === "SWAP" && msg.sidebarUrl && sender.tab) {
     const tabId = sender.tab.id;
     const sidebarUrl = msg.sidebarUrl;

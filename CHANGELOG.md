@@ -1,3 +1,10 @@
+## v0.1.38 - 2026-07-27
+- 修复"在新标签打开"又被拦截回侧边栏的死循环
+- 根因：window.open 创建的新标签有 openerTabId 且 transitionType=link，被再次拦截
+- content script 改用 OPEN_NEW_TAB 消息通知 background 开新标签
+- background 维护 skipUrls 临时跳过集合，tryIntercept 检查目标 URL 跳过
+- 侧边栏顶栏⤢按钮与 fallback 按钮均改走此通道
+
 ## v0.1.37 - 2026-07-27
 - iframe 加载失败/超时检测：8 秒未加载或内容空白时显示提示
 - 提示"该网站无法在侧边栏内加载（可能需要登录或禁止嵌入）"

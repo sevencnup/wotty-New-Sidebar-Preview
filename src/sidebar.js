@@ -235,7 +235,7 @@
     const back = mkBtn("←", "后退", backHistory);
     const fwd = mkBtn("→", "前进", fwdHistory);
     const reload = mkBtn("⟳", "刷新", () => { if (frame && frame.src) rebuildFrame(frame.src); });
-    const openBtn = mkBtn("⤢", "在新标签打开", () => { if (frame && frame.src) window.open(frame.src, "_blank"); });
+    const openBtn = mkBtn("⤢", "在新标签打开", () => { if (frame && frame.src) openInNewTab(frame.src); });
     const close = mkBtn("✕", "关闭", hide);
     const swapBtn = mkBtn("\u21c4", "左右交换：右侧页与左侧主标签互换", swapWithLeft);
     const keyBtn = mkBtn("⌨", "设置关闭快捷键", setShortcut);
@@ -437,7 +437,7 @@
       const btn = document.createElement("button");
       btn.className = "si-fallback-btn";
       btn.textContent = "在新标签打开";
-      btn.addEventListener("click", () => { window.open(url, "_blank"); hide(); });
+      btn.addEventListener("click", () => { openInNewTab(url); hide(); });
       fb.append(tip, btn);
       host.append(fb);
     }
