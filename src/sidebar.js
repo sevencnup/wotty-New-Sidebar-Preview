@@ -20,6 +20,10 @@
     } catch (_) {}
   })();
   function siteEnabledHere() { return siteOn }
+  function openInNewTab(url) {
+    try { chrome.runtime.sendMessage({ type: "OPEN_NEW_TAB", url }); }
+    catch (_) { try { window.open(url, "_blank", "noopener"); } catch (_) {} }
+  }
 
   // 自定义关闭快捷键：域名自定义 > 全局默认 > 硬编码 Esc
   const SHORTCUT_KEY = "si-sidebar-close-shortcut";
