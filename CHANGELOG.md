@@ -1,3 +1,10 @@
+## v0.1.36 - 2026-07-27
+- 严重 bug 修复：新开标签手动输入链接跳转被误拦到其它标签侧边栏
+- 根因：onBeforeNavigate 用旧 openerTabId 拦截新标签任意导航，手动输入也被拦
+- 改用 webNavigation.onCommitted，依据 transitionType 判断
+- 只拦截 link/form_submit 类型导航(链接点击/表单提交)；手动输入地址栏、重载、书签等一律不拦
+- pending 标签首次真实导航后立即清除，不再拦后续导航
+
 ## v0.1.35 - 2026-07-24
 - 新增工具栏弹出面板(popup)：点图标弹出设置界面
 - popup 含当前站点开关(本站生效/失效)与已启用站点列表(可删除)

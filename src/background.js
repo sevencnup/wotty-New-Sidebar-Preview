@@ -91,17 +91,20 @@ chrome.tabs.onCreated.addListener((tab) => {
   tryIntercept(tab.id, tab.openerTabId, url);
 });
 
-chrome.webNavigation.onBeforeNavigate.addListener((d) => {
+chrome.webNavigation.onCommitted.addListener((d) => {
   if (d.frameId !== 0) return;
   const p = pending.get(d.tabId);
   if (!p) return;
   if (isBlank(d.url)) return;
+  pending.delete(d.tabId);
+  persistPending();
   if (handled.has(d.tabId)) return;
   handled.add(d.tabId);
-  pending.delete(d.tabId);
   persistHandled();
+  // 只拦截由链接点击/表单提交触发的导航；手动输入地址栏、重载、书签等不拦
+  const tt = d.transitionType || "";
+  if (tt !== "link" && tt !== "form_submit") return;
   chrome.tabs.get(d.tabId, (tab) => {
-    persistPending();
     const opener = (tab && tab.openerTabId != null) ? tab.openerTabId : p.openerTabId;
     tryIntercept(d.tabId, opener, d.url);
   });
