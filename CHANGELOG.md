@@ -1,3 +1,9 @@
+## v0.1.39 - 2026-07-27
+- 移除分割线上的左右交换箭头按钮(与右上角交换按钮功能重复)
+- 保留右上角 swap 按钮作为唯一左右互换入口
+- splitter title 改为仅"拖拽调整宽度"
+- 清理 .si-swap-arrow CSS
+
 ## v0.1.38 - 2026-07-27
 - 修复"在新标签打开"又被拦截回侧边栏的死循环
 - 根因：window.open 创建的新标签有 openerTabId 且 transitionType=link，被再次拦截
