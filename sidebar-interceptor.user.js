@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sidebar Interceptor - 侧边栏预览
 // @namespace    https://github.com/sevencnup/sidebar-interceptor
-// @version      0.1.0
+// @version      0.2.0
 // @description  拦截页面内新标签跳转，改为右侧滑出侧边栏预览。轻量油猴版，无需安装扩展。
 // @author       sevencnup
 // @match        *://*/*
@@ -140,6 +140,77 @@
   color: #fff !important; font-size: 13px !important; cursor: pointer !important;
 }
 #si-userscript-host .si-fallback-btn:hover { background: #1c8c5c !important; }
+
+/* 设置面板 */
+#si-panel-overlay {
+  position: fixed !important; inset: 0 !important; z-index: 2147483645 !important;
+  background: rgba(0,0,0,0.35) !important; display: none !important;
+  align-items: center !important; justify-content: center !important;
+}
+#si-panel-overlay.show { display: flex !important; }
+#si-panel {
+  width: 290px !important; max-height: 80vh !important;
+  background: #fff !important; border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22) !important;
+  font-family: -apple-system,Segoe UI,Roboto,sans-serif !important;
+  font-size: 13px !important; color: #222 !important;
+  overflow: hidden !important; display: flex !important; flex-direction: column !important;
+}
+#si-panel .sp-header {
+  display: flex !important; align-items: baseline !important; justify-content: space-between !important;
+  padding: 14px 16px 10px !important;
+}
+#si-panel .sp-title { font-weight: 600 !important; font-size: 15px !important; }
+#si-panel .sp-ver { color: #999 !important; font-size: 11px !important; }
+#si-panel .sp-ver a { color: #999 !important; text-decoration: none !important; }
+#si-panel .sp-row {
+  display: flex !important; align-items: center !important; justify-content: space-between !important;
+  padding: 10px 16px !important; border: 1px solid #e3e3e6 !important;
+  border-radius: 8px !important; margin: 0 12px !important; background: #f7f8fa !important;
+}
+#si-panel .sp-row .info { min-width: 0 !important; }
+#si-panel .sp-row .label { color: #888 !important; font-size: 11px !important; margin-bottom: 2px !important; }
+#si-panel .sp-row .host { font-weight: 600 !important; word-break: break-all !important; }
+#si-panel .sp-section { padding: 12px 16px !important; flex: 1 1 auto !important; overflow-y: auto !important; }
+#si-panel .sp-section .label { color: #888 !important; font-size: 11px !important; margin-bottom: 6px !important; }
+#si-panel .sp-list { list-style: none !important; margin: 0 !important; padding: 0 !important; }
+#si-panel .sp-list li {
+  display: flex !important; align-items: center !important; justify-content: space-between !important;
+  padding: 6px 8px !important; border-bottom: 1px solid #f0f0f2 !important;
+}
+#si-panel .sp-list li .h { word-break: break-all !important; flex: 1 1 auto !important; min-width: 0 !important; }
+#si-panel .sp-list li .del { color: #d33 !important; cursor: pointer !important; font-size: 16px !important; line-height: 1 !important; padding: 0 4px !important; flex: 0 0 auto !important; }
+#si-panel .sp-list li .del:hover { color: #a00 !important; }
+#si-panel .sp-empty { color: #aaa !important; font-size: 12px !important; padding: 8px 0 !important; }
+#si-panel .sp-actions { padding: 10px 16px !important; border-top: 1px solid #f0f0f2 !important; text-align: center !important; }
+#si-panel .sp-close-btn {
+  padding: 6px 24px !important; border: 1px solid #ddd !important; border-radius: 6px !important;
+  background: #fff !important; cursor: pointer !important; font-size: 13px !important; color: #555 !important;
+}
+#si-panel .sp-close-btn:hover { background: #f5f5f5 !important; }
+
+/* toggle switch */
+#si-panel .sp-switch { position: relative !important; display: inline-block !important; width: 40px !important; height: 22px !important; flex: 0 0 auto !important; }
+#si-panel .sp-switch input { opacity: 0 !important; width: 0 !important; height: 0 !important; }
+#si-panel .sp-slider { position: absolute !important; cursor: pointer !important; inset: 0 !important; background: #ccc !important; border-radius: 22px !important; transition: .2s !important; }
+#si-panel .sp-slider:before { content: "" !important; position: absolute !important; height: 16px !important; width: 16px !important; left: 3px !important; top: 3px !important; background: #fff !important; border-radius: 50% !important; transition: .2s !important; }
+#si-panel input:checked + .sp-slider { background: #22a06b !important; }
+#si-panel input:checked + .sp-slider:before { transform: translateX(18px) !important; }
+
+/* 悬浮按钮 */
+#si-userscript-toggle {
+  position: fixed !important; bottom: 12px !important; right: 12px !important;
+  width: 36px !important; height: 36px !important;
+  border-radius: 50% !important; border: none !important;
+  background: rgba(34,160,107,0.85) !important;
+  color: #fff !important; font-size: 18px !important; line-height: 36px !important;
+  text-align: center !important; cursor: pointer !important;
+  z-index: 2147483644 !important; user-select: none !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25) !important;
+  transition: background 0.2s, transform 0.15s !important;
+}
+#si-userscript-toggle:hover { transform: scale(1.1) !important; }
+#si-userscript-toggle.off { background: rgba(0,0,0,0.45) !important; }
   `);
 
   // ===== DOM =====
@@ -475,39 +546,158 @@
     openUrl(a.href);
   }, true);
 
-  // ===== 悬浮开关按钮 =====
-  function createToggle() {
-    const btn = document.createElement("div");
-    btn.id = "si-userscript-toggle";
-    btn.title = "Sidebar Interceptor: " + (siteEnabled() ? "已启用" : "已停用");
-    btn.innerHTML = siteEnabled() ? "◉" : "◎";
-    btn.style.cssText = `
-position: fixed !important; bottom: 12px !important; right: 12px !important;
-width: 32px !important; height: 32px !important;
-border-radius: 50% !important; background: rgba(0,0,0,0.55) !important;
-color: #fff !important; font-size: 16px !important; line-height: 32px !important;
-text-align: center !important; cursor: pointer !important;
-z-index: 2147483646 !important; user-select: none !important;
-transition: background 0.2s !important;
-`;
-    btn.addEventListener("click", () => {
-      const on = toggleSite();
-      btn.innerHTML = on ? "◉" : "◎";
-      btn.title = "Sidebar Interceptor: " + (on ? "已启用" : "已停用");
-      btn.style.background = on ? "rgba(34,160,107,0.8)" : "rgba(0,0,0,0.55)";
+  // ===== 设置面板 =====
+  function createPanel() {
+    // 遮罩层
+    const overlay = document.createElement("div");
+    overlay.id = "si-panel-overlay";
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closePanel();
     });
-    if (siteEnabled()) btn.style.background = "rgba(34,160,107,0.8)";
-    document.documentElement.appendChild(btn);
+
+    const panel = document.createElement("div");
+    panel.id = "si-panel";
+
+    // 头部
+    const header = document.createElement("div");
+    header.className = "sp-header";
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "sp-title";
+    titleSpan.textContent = "Sidebar Interceptor";
+    const verSpan = document.createElement("span");
+    verSpan.className = "sp-ver";
+    verSpan.innerHTML = '油猴版 v0.2.0 <a href="https://github.com/sevencnup/sidebar-interceptor" target="_blank">GitHub</a>';
+    header.append(titleSpan, verSpan);
+
+    // 当前站点行
+    const row = document.createElement("div");
+    row.className = "sp-row";
+    const info = document.createElement("div");
+    info.className = "info";
+    const labelDiv = document.createElement("div");
+    labelDiv.className = "label";
+    labelDiv.textContent = "当前站点";
+    const hostDiv = document.createElement("div");
+    hostDiv.className = "host";
+    hostDiv.textContent = location.hostname || "—";
+    info.append(labelDiv, hostDiv);
+
+    const switchLabel = document.createElement("label");
+    switchLabel.className = "sp-switch";
+    const toggleInput = document.createElement("input");
+    toggleInput.type = "checkbox";
+    toggleInput.checked = siteEnabled();
+    const slider = document.createElement("span");
+    slider.className = "sp-slider";
+    switchLabel.append(toggleInput, slider);
+
+    toggleInput.addEventListener("change", () => {
+      toggleSite();
+      updateToggleBtn();
+      renderSiteList();
+    });
+
+    row.append(info, switchLabel);
+
+    // 已启用站点列表
+    const section = document.createElement("div");
+    section.className = "sp-section";
+    const secLabel = document.createElement("div");
+    secLabel.className = "label";
+    secLabel.textContent = "已启用站点";
+    const listEl = document.createElement("ul");
+    listEl.className = "sp-list";
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "sp-empty";
+    emptyEl.textContent = "暂无启用站点";
+    section.append(secLabel, listEl, emptyEl);
+
+    function renderSiteList() {
+      listEl.innerHTML = "";
+      const sites = getSites();
+      if (sites.size === 0) { emptyEl.style.display = ""; return; }
+      emptyEl.style.display = "none";
+      const arr = [...sites].sort();
+      for (const h of arr) {
+        const li = document.createElement("li");
+        const span = document.createElement("span");
+        span.className = "h";
+        span.textContent = h;
+        const del = document.createElement("span");
+        del.className = "del";
+        del.textContent = "✕";
+        del.title = "移除";
+        del.addEventListener("click", () => {
+          const s = getSites();
+          s.delete(h);
+          saveSites(s);
+          renderSiteList();
+          if (h === location.hostname) {
+            toggleInput.checked = false;
+            updateToggleBtn();
+          }
+        });
+        li.append(span, del);
+        listEl.append(li);
+      }
+    }
+
+    // 关闭按钮
+    const actions = document.createElement("div");
+    actions.className = "sp-actions";
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "sp-close-btn";
+    closeBtn.textContent = "关闭";
+    closeBtn.addEventListener("click", closePanel);
+    actions.append(closeBtn);
+
+    panel.append(header, row, section, actions);
+    overlay.append(panel);
+    document.documentElement.appendChild(overlay);
+
+    function openPanel() {
+      toggleInput.checked = siteEnabled();
+      renderSiteList();
+      overlay.classList.add("show");
+    }
+    function closePanel() { overlay.classList.remove("show"); }
+
+    return { overlay, open: openPanel, close: closePanel, renderList: renderSiteList };
+  }
+
+  // ===== 悬浮按钮 =====
+  let panelCtrl = null;
+  let toggleBtn = null;
+
+  function createToggleBtn() {
+    toggleBtn = document.createElement("button");
+    toggleBtn.id = "si-userscript-toggle";
+    updateToggleBtn();
+    toggleBtn.addEventListener("click", () => {
+      if (!panelCtrl) {
+        panelCtrl = createPanel();
+      }
+      panelCtrl.open();
+    });
+    document.documentElement.appendChild(toggleBtn);
+  }
+
+  function updateToggleBtn() {
+    if (!toggleBtn) return;
+    const on = siteEnabled();
+    toggleBtn.innerHTML = on ? "◉" : "◎";
+    toggleBtn.title = "Sidebar Interceptor: " + (on ? "已启用" : "已停用") + "\n点击打开设置面板";
+    if (on) toggleBtn.classList.remove("off");
+    else toggleBtn.classList.add("off");
   }
 
   // ===== 初始化 =====
   function init() {
-    // 排除特殊页面
-    if (window !== window.top) return; // 不在 iframe 中运行
+    if (window !== window.top) return;
     const proto = location.protocol;
     if (proto !== "http:" && proto !== "https:") return;
-    createToggle();
-    console.log("[Sidebar Interceptor] 油猴版已加载，当前网站：" + (siteEnabled() ? "已启用" : "已停用，点右下角按钮开启"));
+    createToggleBtn();
+    console.log("[Sidebar Interceptor] 油猴版已加载，当前网站：" + (siteEnabled() ? "已启用" : "已停用") + "，点右下角按钮打开设置");
   }
 
   if (document.readyState === "loading") {
