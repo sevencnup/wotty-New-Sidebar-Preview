@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Sidebar Interceptor - 侧边栏预览
 // @namespace    https://github.com/sevencnup/sidebar-interceptor
-// @version      0.2.0
+// @version      0.2.1
 // @description  拦截页面内新标签跳转，改为右侧滑出侧边栏预览。轻量油猴版，无需安装扩展。
 // @author       sevencnup
 // @match        *://*/*
@@ -11,6 +11,7 @@
 // @grant        GM_listValues
 // @grant        GM_openInTab
 // @grant        GM_addStyle
+// @grant        GM_registerMenuCommand
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
@@ -540,11 +541,26 @@
     const rootPath = u.pathname === "/" || u.pathname === "";
     if (rootPath && !u.search) return;
     const tgt = (a.target || "").toLowerCase();
-    if (tgt === "_blank" || tgt === "_new") return;
+    if (tgt === "_blank" || tgt === "_new") a.removeAttribute("target");
     e.preventDefault();
     e.stopPropagation();
     openUrl(a.href);
   }, true);
+
+  // ===== window.open 拦截 =====
+  const rawWindowOpen = window.open;
+  window.open = function(url, target, features) {
+    if (siteEnabled() && typeof url === "string") {
+      try {
+        const u = new URL(url, location.href);
+        if (u.protocol === "http:" || u.protocol === "https:") {
+          openUrl(u.href);
+          return null;
+        }
+      } catch (_) {}
+    }
+    return rawWindowOpen.call(window, url, target, features);
+  };
 
   // ===== 设置面板 =====
   function createPanel() {
@@ -566,7 +582,7 @@
     titleSpan.textContent = "Sidebar Interceptor";
     const verSpan = document.createElement("span");
     verSpan.className = "sp-ver";
-    verSpan.innerHTML = '油猴版 v0.2.0 <a href="https://github.com/sevencnup/sidebar-interceptor" target="_blank">GitHub</a>';
+    verSpan.innerHTML = '油猴版 v0.2.1 <a href="https://github.com/sevencnup/sidebar-interceptor" target="_blank">GitHub</a>';
     header.append(titleSpan, verSpan);
 
     // 当前站点行
@@ -665,9 +681,28 @@
     return { overlay, open: openPanel, close: closePanel, renderList: renderSiteList };
   }
 
-  // ===== 悬浮按钮 =====
+  // ===== 悬浮按钮 / 菜单入口 =====
   let panelCtrl = null;
   let toggleBtn = null;
+
+  function openSettingsPanel() {
+    if (!panelCtrl) panelCtrl = createPanel();
+    panelCtrl.open();
+  }
+
+  function toggleCurrentSite() {
+    const on = toggleSite();
+    updateToggleBtn();
+    if (panelCtrl) panelCtrl.renderList();
+    alert("Sidebar Interceptor 已" + (on ? "启用" : "停用") + "当前站点：" + location.hostname);
+  }
+
+  function registerMenus() {
+    if (typeof GM_registerMenuCommand !== "function") return;
+    GM_registerMenuCommand("打开设置面板", openSettingsPanel);
+    GM_registerMenuCommand((siteEnabled() ? "停用" : "启用") + "当前站点：" + location.hostname, toggleCurrentSite);
+    GM_registerMenuCommand("查看项目 GitHub", () => GM_openInTab("https://github.com/sevencnup/sidebar-interceptor", { active: true }));
+  }
 
   function createToggleBtn() {
     toggleBtn = document.createElement("button");
@@ -696,8 +731,9 @@
     if (window !== window.top) return;
     const proto = location.protocol;
     if (proto !== "http:" && proto !== "https:") return;
-    createToggleBtn();
-    console.log("[Sidebar Interceptor] 油猴版已加载，当前网站：" + (siteEnabled() ? "已启用" : "已停用") + "，点右下角按钮打开设置");
+    registerMenus();
+    if (GM_getValue("si-show-floating-button", true)) createToggleBtn();
+    console.log("[Sidebar Interceptor] 油猴版已加载，当前网站：" + (siteEnabled() ? "已启用" : "已停用") + "，可从油猴菜单打开设置");
   }
 
   if (document.readyState === "loading") {
