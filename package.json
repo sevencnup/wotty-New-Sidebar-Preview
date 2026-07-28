@@ -1,0 +1,26 @@
+{
+  "name": "sidebar-interceptor",
+  "version": "1.0.0",
+  "description": "一个 Chrome / Edge 浏览器扩展（Manifest V3）。把浏览器中**所有**\"打开新标签页 / 新窗口\"的跳转拦截下来，改为在当前页右侧滑出一个侧边栏，用 iframe 加载目标页面。",
+  "main": "sidebar-interceptor.user.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sevencnup/wotty-New-Sidebar-Preview.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sevencnup/wotty-New-Sidebar-Preview/issues"
+  },
+  "homepage": "https://github.com/sevencnup/wotty-New-Sidebar-Preview#readme",
+  "dependencies": {
+    "sharp": "^0.35.3"
+  }
+}
